@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{633DC49A-51C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cli", "src\Cli\Cli.csproj", "{9943455B-B3B3-45BD-BE2F-616DE283D7C4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "src\Core\Core.csproj", "{1BF5C317-BCC5-483A-8978-261215E23FD0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,8 +22,13 @@ Global
 		{9943455B-B3B3-45BD-BE2F-616DE283D7C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9943455B-B3B3-45BD-BE2F-616DE283D7C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9943455B-B3B3-45BD-BE2F-616DE283D7C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1BF5C317-BCC5-483A-8978-261215E23FD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1BF5C317-BCC5-483A-8978-261215E23FD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1BF5C317-BCC5-483A-8978-261215E23FD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1BF5C317-BCC5-483A-8978-261215E23FD0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{9943455B-B3B3-45BD-BE2F-616DE283D7C4} = {633DC49A-51C9-4E54-9A39-435C75CB73EE}
+		{1BF5C317-BCC5-483A-8978-261215E23FD0} = {633DC49A-51C9-4E54-9A39-435C75CB73EE}
 	EndGlobalSection
 EndGlobal
