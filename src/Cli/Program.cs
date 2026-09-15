@@ -25,6 +25,7 @@ else
     Console.WriteLine($"ОС (Environment) : {report.EnvironmentOs}");
     Console.WriteLine($"Архітектура процесу : {report.ProcessArchitecture}");
     Console.WriteLine($"Версія .NET (CLR) : {report.DotNetVersion}");
+    Console.WriteLine($"Примітка збірки : {report.BuildNote}");
     Console.WriteLine($"Runtime : {report.FrameworkDescription}");
     
     // Нові поля з лабораторної 2:

@@ -1,8 +1,7 @@
 using System.Runtime.InteropServices;
 
-namespace Core; // Корінний простір імен для бібліотеки
+namespace Core;
 
-// Record відповідає лише за ЗБЕРЕЖЕННЯ даних. Це як контейнер.
 public sealed record EnvironmentReport(
     string Student,
     string Domain,
@@ -14,12 +13,19 @@ public sealed record EnvironmentReport(
     string BaseDirectory,
     string CurrentDirectory,
     string DetectedRid,
-    string ReportedRid
+    string ReportedRid,
+    string BuildNote // <--- 1. ДОДАНО НОВЕ ПОЛЕ
 );
 
-// Static class відповідає за ПОВЕДІНКУ (збір цих даних).
 public static class EnvironmentInfo
 {
+    // 2. ДОДАНА ДИРЕКТИВА КОМПІЛЯТОРА
+#if NET10_0_OR_GREATER
+    const string BuildNote = "збірка під net10.0";
+#else
+    const string BuildNote = "збірка під net8.0";
+#endif
+
     public static EnvironmentReport Collect() => new(
         "Долошецька Соломія Миколаївна, група ФЕІ-36",
         "Замовлення (клієнти, товари, замовлення, рядок замовлення)",
@@ -31,12 +37,13 @@ public static class EnvironmentInfo
         AppContext.BaseDirectory,
         Environment.CurrentDirectory,
         DetectRid(),
-        RuntimeInformation.RuntimeIdentifier
+        RuntimeInformation.RuntimeIdentifier,
+        BuildNote // <--- 3. ПЕРЕДАЄМО ЗНАЧЕННЯ
     );
 
-    // Ручне визначення RID (Runtime Identifier) за допомогою тернарних операторів та switch
     private static string DetectRid()
     {
+        // ... (твій попередній код DetectRid залишається без змін)
         string os =
             RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "win" :
             RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "linux" :
@@ -48,7 +55,7 @@ public static class EnvironmentInfo
             Architecture.X86 => "x86",
             Architecture.Arm64 => "arm64",
             Architecture.Arm => "arm",
-            _ => "unknown" // Гілка за замовчуванням (дискерд)
+            _ => "unknown"
         };
 
         return $"{os}-{arch}";
