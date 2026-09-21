@@ -1,39 +1,35 @@
-﻿using System.Text.Json;
-using System.Text.Encodings.Web;
-using Core; // Підключаємо нашу нову бібліотеку
+﻿using Core.Dto;
+using Core.Import;
 
-// 1. Отримуємо всі дані з бібліотеки Core ОДНИМ викликом
-EnvironmentReport report = EnvironmentInfo.Collect();
+// 1. Беремо шлях з аргументів або використовуємо файл за замовчуванням
+string path = args.Length > 0 ? args[0] : Path.Combine("data", "sample.csv");
 
-// 2. Форматуємо вивід залежно від наявності прапорця --json
-if (args.Contains("--json"))
+// 2. Перевіряємо, чи існує файл, щоб уникнути падіння програми
+if (!File.Exists(path))
 {
-    var options = new JsonSerializerOptions 
-    { 
-        WriteIndented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
-    string jsonString = JsonSerializer.Serialize(report, options);
-    Console.WriteLine(jsonString);
+    Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
+    return 1; // Повертаємо код помилки
 }
-else
+
+// 3. Викликаємо наш парсер
+ImportResult<ProductDto> result = ProductCsvImporter.Load(path);
+
+// 4. Виводимо успішні результати (перші 5 штук)
+Console.WriteLine($"Завантажено записів: {result.Items.Count}");
+foreach (ProductDto p in result.Items.Take(5))
 {
-    Console.WriteLine("CrossApp – практикум з крос-платформного програмування");
-    Console.WriteLine($"Студентка: {report.Student}");
-    Console.WriteLine(new string('-', 52));
-    Console.WriteLine($"ОС (OSDescription) : {report.OsDescription}");
-    Console.WriteLine($"ОС (Environment) : {report.EnvironmentOs}");
-    Console.WriteLine($"Архітектура процесу : {report.ProcessArchitecture}");
-    Console.WriteLine($"Версія .NET (CLR) : {report.DotNetVersion}");
-    Console.WriteLine($"Примітка збірки : {report.BuildNote}");
-    Console.WriteLine($"Runtime : {report.FrameworkDescription}");
-    
-    // Нові поля з лабораторної 2:
-    Console.WriteLine($"RID (визначено) : {report.DetectedRid}");
-    Console.WriteLine($"RID (від .NET) : {report.ReportedRid}");
-    
-    Console.WriteLine($"Каталог застосунку : {report.BaseDirectory}");
-    Console.WriteLine($"Поточний каталог : {report.CurrentDirectory}");
-    Console.WriteLine(new string('-', 52));
-    Console.WriteLine($"Предметна область: {report.Domain}");
+    // Цифри після коми (напр. -6) роблять рівні відступи, щоб вийшла гарна табличка
+    Console.WriteLine($" {p.Id,-6} {p.Name,-26} {p.Price, 10:F2} {p.Note}");
 }
+
+// 5. Виводимо помилки, якщо вони є
+if (result.Errors.Count > 0)
+{
+    Console.WriteLine($"\nПропущено рядків: {result.Errors.Count}");
+    foreach (string e in result.Errors)
+    {
+        Console.WriteLine($" ! {e}");
+    }
+}
+
+return 0; // Код успішного завершення

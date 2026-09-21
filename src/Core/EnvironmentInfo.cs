@@ -43,7 +43,7 @@ public static class EnvironmentInfo
 
     private static string DetectRid()
     {
-        // ... (твій попередній код DetectRid залишається без змін)
+        // ... (попередній код DetectRid залишається без змін)
         string os =
             RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "win" :
             RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "linux" :
