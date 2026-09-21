@@ -1,0 +1,13 @@
+[
+  {
+    "Id": "P-101",
+    "Name": "Мишка Apple Magic Mouse",
+    "Price": 3500.0,
+    "Note": "Біла"
+  },
+  {
+    "Id": "P-102",
+    "Name": "Клавіатура Apple Magic Keyboard",
+    "Price": 4200.0
+  }
+]
