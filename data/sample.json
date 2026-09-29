@@ -3,11 +3,19 @@
     "Id": "P-101",
     "Name": "Мишка Apple Magic Mouse",
     "Price": 3500.0,
+    "Quantity": 20,
     "Note": "Біла"
   },
   {
     "Id": "P-102",
     "Name": "Клавіатура Apple Magic Keyboard",
-    "Price": 4200.0
+    "Price": 4200.0,
+    "Quantity": 15
+  },
+  {
+    "Id": " ",
+    "Name": "Клавіатура Apple Magic Keyboard",
+    "Price": -2000,
+    "Quantity": -10
   }
 ]

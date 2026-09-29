@@ -2,7 +2,7 @@ namespace Core.Dto;
 
 // Використовуємо узагальнений тип <T>, щоб цей результат міг працювати
 // як з ProductDto, так і з CustomerDto чи будь-яким іншим типом.
-public sealed record ImportResult<T>(
+public sealed record ImportResult<T>( //sealed строго забороняє успадковуватися
     IReadOnlyList<T> Items,
     IReadOnlyList<string> Errors
 );

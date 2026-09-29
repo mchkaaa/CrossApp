@@ -47,36 +47,40 @@ public static class MixedCsvImporter
         return new MixedImportResult(products, customers, errors);
     }
 
-    private static ParseOutcome ParseLine(string line)
+   private static ParseOutcome ParseLine(string line)
+{
+    string[] parts = line.Split(Separator, StringSplitOptions.TrimEntries);
+
+    return parts switch
     {
-        string[] parts = line.Split(Separator, StringSplitOptions.TrimEntries);
+        // --- ПАТЕРНИ ДЛЯ ТОВАРІВ (префікс "P") ---
+        ["P", var id, var name, var priceStr, var qtyStr] 
+            when decimal.TryParse(priceStr, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal p) 
+              && int.TryParse(qtyStr, NumberStyles.Number, CultureInfo.InvariantCulture, out int q) 
+              && p >= 0 
+            => new ParseProductOk(new ProductDto(id, name, p, q)),
+            
+        ["P", var id, var name, var priceStr, var qtyStr, var note] 
+            when decimal.TryParse(priceStr, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal p) 
+              && int.TryParse(qtyStr, NumberStyles.Number, CultureInfo.InvariantCulture, out int q) 
+              && p >= 0 
+            => new ParseProductOk(new ProductDto(id, name, p, q, note)),
+            
+        ["P", ..] => new ParseFailed("некоректний формат рядка товару"),
 
-        return parts switch
-        {
-            // --- ПАТЕРНИ ДЛЯ ТОВАРІВ (префікс "P") ---
-            ["P", var id, var name, var priceStr] 
-                when decimal.TryParse(priceStr, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal p) && p >= 0
-                => new ParseProductOk(new ProductDto(id, name, p)),
-                
-            ["P", var id, var name, var priceStr, var note] 
-                when decimal.TryParse(priceStr, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal p) && p >= 0
-                => new ParseProductOk(new ProductDto(id, name, p, note)),
-                
-            ["P", ..] => new ParseFailed("некоректний формат рядка товару"),
+        // --- ПАТЕРНИ ДЛЯ КЛІЄНТІВ (префікс "C") ---
+        ["C", var id, var name, var email] 
+            => new ParseCustomerOk(new CustomerDto(id, name, email)),
+            
+        ["C", var id, var name, var email, var phone] 
+            => new ParseCustomerOk(new CustomerDto(id, name, email, phone)),
+            
+        ["C", ..] => new ParseFailed("некоректний формат рядка клієнта"),
 
-            // --- ПАТЕРНИ ДЛЯ КЛІЄНТІВ (префікс "C") ---
-            ["C", var id, var name, var email] 
-                => new ParseCustomerOk(new CustomerDto(id, name, email)),
-                
-            ["C", var id, var name, var email, var phone] 
-                => new ParseCustomerOk(new CustomerDto(id, name, email, phone)),
-                
-            ["C", ..] => new ParseFailed("некоректний формат рядка клієнта"),
-
-            // --- НЕВІДОМИЙ ПРЕФІКС ---
-            _ => new ParseFailed($"невідомий префікс рядка '{parts[0]}'")
-        };
-    }
+        // --- НЕВІДОМИЙ ПРЕФІКС ---
+        _ => new ParseFailed($"невідомий префікс рядка '{parts[0]}'")
+    };
+}
 
     // Внутрішні типи тепер мають дві гілки успіху
     private abstract record ParseOutcome;

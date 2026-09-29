@@ -43,34 +43,37 @@ public static class ProductCsvImporter
     }
 
     private static ParseOutcome ParseLine(string line)
+{
+    string[] parts = line.Split(Separator, StringSplitOptions.TrimEntries);
+
+    return parts switch
     {
-        string[] parts = line.Split(Separator, StringSplitOptions.TrimEntries);
-
-        return parts switch
-        {
-            // Реляційний патерн властивості: якщо частин менше 3
-            { Length: < 3 } => new ParseFailed($"очікую щонайменше 3 колонки, отримав {parts.Length}"),
+        // Реляційний патерн властивості: оскільки додалася Quantity, тепер мінімум 4 колонки
+        { Length: < 4 } => new ParseFailed($"очікую щонайменше 4 колонки, отримав {parts.Length}"),
+        
+        // Патерн списку: якщо друга колонка (назва) порожня
+        [_, "", ..] => new ParseFailed("назва товару порожня"),
+        
+        // Охоронна умова для ціни: якщо не спарсилося або від'ємна
+        [var id, var name, var priceStr, var qtyStr, ..] when !decimal.TryParse(priceStr, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal p) || p < 0
+            => new ParseFailed($"ціна '{priceStr}' не є коректним додатним числом"),
             
-            // Патерн списку + константний патерн: якщо друга колонка (назва) порожня
-            [_, "", ..] => new ParseFailed("назва товару порожня"),
+        // Охоронна умова для кількості (НОВЕ): якщо не спарсилося або від'ємна
+        [var id, var name, var priceStr, var qtyStr, ..] when !int.TryParse(qtyStr, NumberStyles.Number, CultureInfo.InvariantCulture, out int q) || q < 0
+            => new ParseFailed($"кількість '{qtyStr}' не є коректним додатним числом"),
             
-            // Охоронна умова when: пробуємо спарсити ціну. Якщо не вийшло або вона від'ємна — помилка
-            [var id, var name, var priceStr, ..] when !decimal.TryParse(priceStr, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal p) || p < 0
-                => new ParseFailed($"ціна '{priceStr}' не є коректним додатним числом"),
-                
-            // Успішний розбір 3 колонок (без примітки)
-            [var id, var name, var priceStr]
-                => new ParseOk(new ProductDto(id, name, decimal.Parse(priceStr, CultureInfo.InvariantCulture))),
-                
-            // Успішний розбір 4 колонок (з приміткою)
-            [var id, var name, var priceStr, var note]
-                => new ParseOk(new ProductDto(id, name, decimal.Parse(priceStr, CultureInfo.InvariantCulture), note)),
-                
-            // Гілка за замовчуванням
-            _ => new ParseFailed($"занадто багато колонок: {parts.Length}")
-        };
-    }
-
+        // Успішний розбір 4 колонок (без примітки)
+        [var id, var name, var priceStr, var qtyStr]
+            => new ParseOk(new ProductDto(id, name, decimal.Parse(priceStr, CultureInfo.InvariantCulture), int.Parse(qtyStr, CultureInfo.InvariantCulture))),
+            
+        // Успішний розбір 5 колонок (з приміткою)
+        [var id, var name, var priceStr, var qtyStr, var note]
+            => new ParseOk(new ProductDto(id, name, decimal.Parse(priceStr, CultureInfo.InvariantCulture), int.Parse(qtyStr, CultureInfo.InvariantCulture), note)),
+            
+        // Гілка за замовчуванням
+        _ => new ParseFailed($"занадто багато колонок: {parts.Length}")
+    };
+}
 
 // Внутрішня ієрархія типів для результату розбору одного рядка
 private abstract record ParseOutcome;
