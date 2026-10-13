@@ -1,4 +1,5 @@
 using System;
+using CrossApp.Core.Dto;
 
 namespace CrossApp.Core.Domain;
 
@@ -45,5 +46,28 @@ public class Order
             throw new InvalidOperationException($"Неприпустимий перехід статусу замовлення з {Status} у {newStatus}");
         }
         Status = newStatus;
+    }
+
+    // =========================================================
+    // НОВЕ: МЕТОДИ ДЛЯ 5-Ї ЛАБОРАТОРНОЇ РОБОТИ (МАПІНГ З/В DTO)
+    // =========================================================
+
+    // 3. Відновлення об'єкта з JSON-файлу
+    public static Order FromDto(OrderDto dto)
+    {
+        // Ми викликаємо приватний конструктор, щоб відновити базові дані.
+        var order = new Order(dto.Id, dto.CustomerId);
+        
+        // Відновлюємо поточний стан (навіть private set доступний всередині класу)
+        order.IsActive = dto.IsActive;
+        order.Status = dto.Status;
+        
+        return order;
+    }
+
+    // 4. Пакування об'єкта для збереження на диск
+    public OrderDto ToDto()
+    {
+        return new OrderDto(Id, CustomerId, IsActive, Status);
     }
 }

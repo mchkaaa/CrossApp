@@ -1,120 +1,58 @@
 ﻿using System;
-using System.Collections.Generic;
-using Core.Domain;
-using Core.Dto; // Додано для доступу до ProductDto та ImportResult
+using System.IO;
+using System.Linq;
 using CrossApp.Core.Domain;
+using CrossApp.Core.Services;
+using Core.Storage;
+using Core.Abstractions;
 
-Console.WriteLine("=== Сценарій 1: Успішна робота ===");
-Product product = Product.Create("P-001", "Ноутбук Dell", 45000m, 10);
-Console.WriteLine(product);
+// 1. Читаємо аргументи під час запуску (чи є прапорець --file)
+bool useFile = args.Contains("--file");
+string dataPath = Path.Combine(AppContext.BaseDirectory, "data", "orders.json");
 
-product.RegisterArrival(5); // Додали 5
-product.Issue(3);           // Видали 3
-Console.WriteLine(product); // Залишок має бути 12
-Console.WriteLine();
+// 2. Composition Root: Ручне впровадження залежностей (DI)
+// Якщо консоль запущена з --file, створюємо FileOrderStore, інакше - InMemoryOrderStore
+IOrderStore baseStore = useFile 
+    ? new FileOrderStore(dataPath) 
+    : new InMemoryOrderStore();
 
-Console.WriteLine("=== Сценарій 2: Порушення інваріантів ===");
+// Обертаємо сховище в Декоратор (якщо робимо Додаткове завдання 1)[cite: 12]
+IOrderStore store = new CachingOrderStore(baseStore);
 
-TryDo("Видача більша за залишок", () => product.Issue(100));
-TryDo("Порожня назва при створенні", () => Product.Create("P-002", "", 500m, 10));
-TryDo("Від'ємна кількість приходу", () => product.RegisterArrival(-5));
+// Передаємо створене сховище в наш сервіс[cite: 6]
+var service = new OrderService(store);
 
-// Допоміжний метод для відлову помилок
-static void TryDo(string title, Action action)
-{
-    try
-    {
-        action();
-        Console.WriteLine($"{title}: виняток НЕ спрацював - інваріант відсутній!");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"{title}: {ex.GetType().Name} - {ex.Message}");
-    }
-}
+Console.WriteLine($"Сховище: {store.GetType().Name}");
 
-Console.WriteLine("=== Сценарій 3: Перевірка додаткового завдання 1 ===");
-// Створюємо фейковий результат імпорту з 3-ї лаби
-var fakeImportResult = new ImportResult<ProductDto>(
-    new List<ProductDto> 
-    { 
-        new ProductDto("P-998", "Нормальний товар", 100m, 10, null),
-        new ProductDto("P-999", "Поламаний товар", -50m, 5, null)
-    },
-    new List<string> { "Якась синтаксична помилка парсера (рядок 1)" }
-);
+// ==========================================
+// СЦЕНАРІЙ РОБОТИ (Замість старого TryDo)
+// ==========================================
 
-// Викликаємо наш метод
-var (valid, mapErrors) = MapToDomain(fakeImportResult);
-
-Console.WriteLine($"Успішно створено сутностей: {valid.Count}");
-Console.WriteLine($"Загальна кількість помилок: {mapErrors.Count}");
-foreach (var err in mapErrors)
-{
-    Console.WriteLine($" - {err}");
-}
-Console.WriteLine();
-
-// Додаткове завдання 1
-static (List<Product> ValidProducts, List<string> AllErrors) MapToDomain(ImportResult<ProductDto> import)
-{
-    var products = new List<Product>();
-    var errors = new List<string>(import.Errors);
-
-    foreach (var dto in import.Items)
-    {
-        try
-        {
-            Product p = Product.FromDto(dto);
-            products.Add(p);
-        }
-        catch (Exception ex)
-        {
-            errors.Add($"Помилка бізнес-логіки у товарі {dto.Id}: {ex.Message}");
-        }
-    }
-
-    return (products, errors);
-}
-
-Console.WriteLine("=== Сценарій 4: Інваріант для двох сутностей (Domain Service) ===");
-
-var orderService = new OrderService();
-var customerId = "CUST-001";
-
-// Імітуємо, що у клієнта в базі вже є 3 активні замовлення
-orderService.ExistingOrders.Add(Order.Create("ORD-1", customerId));
-orderService.ExistingOrders.Add(Order.Create("ORD-2", customerId));
-orderService.ExistingOrders.Add(Order.Create("ORD-3", customerId));
-
+Console.WriteLine("\n=== Сценарій 1: Успішне створення замовлень ===");
 try
 {
-    Console.WriteLine($"Спроба клієнта {customerId} створити 4-те активне замовлення...");
-    var newOrder = orderService.CreateOrder("ORD-4", customerId);
+    var order1 = service.CreateOrder("ORD-001", "CUST-777");
+    Console.WriteLine($"Створено замовлення: {order1.Id} для клієнта CUST-777");
+    
+    var order2 = service.CreateOrder("ORD-002", "CUST-777");
+    Console.WriteLine($"Створено замовлення: {order2.Id} для клієнта CUST-777");
+    
+    var order3 = service.CreateOrder("ORD-003", "CUST-777");
+    Console.WriteLine($"Створено замовлення: {order3.Id} для клієнта CUST-777");
 }
-catch (InvalidOperationException ex)
+catch (Exception ex)
 {
-    Console.WriteLine($"Успішно відловлено помилку сервісу: {ex.Message}");
+    Console.WriteLine($"Помилка: {ex.Message}");
 }
-Console.WriteLine();
 
-Console.WriteLine("=== Сценарій 5: Перевірка станів (switch expression) ===");
-var statusOrder = Order.Create("ORD-99", "CUST-002");
-Console.WriteLine($"Початковий статус: {statusOrder.Status}");
-
-// Успішний перехід
-statusOrder.ChangeStatus(OrderStatus.Confirmed);
-Console.WriteLine($"Змінили статус на: {statusOrder.Status}");
-
+// Крок 6: Сценарій відмови (перевірка бізнес-правила на 4-му замовленні)[cite: 6]
+Console.WriteLine("\n=== Сценарій 2: Відмова (Перевищення ліміту) ===");
 try
 {
-    Console.WriteLine("Спроба перевести Confirmed назад у Draft...");
-    // Цей перехід заборонений правилами у switch
-    statusOrder.ChangeStatus(OrderStatus.Draft);
+    Console.WriteLine("Спроба створити 4-те активне замовлення для CUST-777...");
+    service.CreateOrder("ORD-004", "CUST-777"); // Цей рядок має викликати виняток
 }
-catch (InvalidOperationException ex)
+catch (Exception ex) // Перехоплюємо виняток у Cli[cite: 6]
 {
-    Console.WriteLine($"Успішно відловлено помилку: {ex.Message}");
+    Console.WriteLine($"БЛОКУВАННЯ: {ex.Message}"); // Друкуємо зрозумілий текст[cite: 6]
 }
-Console.WriteLine();
-

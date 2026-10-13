@@ -53,7 +53,7 @@ public sealed class Product
     }
 
     // Методи зміни стану
-    public void RegisterArrival(int amount)
+    public void RegisterArrival(int amount) //Прийом товару на склад
     {
         if (amount <= 0)
             throw new ArgumentOutOfRangeException(nameof(amount), amount, "Кількість приходу має бути більшою за нуль");
@@ -61,7 +61,7 @@ public sealed class Product
         _quantity += amount;
     }
 
-    public void Issue(int amount)
+    public void Issue(int amount)  //Видача / списання товару зі складу
     {
         if (amount <= 0)
             throw new ArgumentOutOfRangeException(nameof(amount), amount, "Кількість видачі має бути більшою за нуль");
