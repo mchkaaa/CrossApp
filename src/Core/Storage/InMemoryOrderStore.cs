@@ -6,7 +6,7 @@ namespace Core.Storage;
 
 public sealed class InMemoryOrderStore(IEnumerable<Order>? seed = null) : IOrderStore
 {
-    // Словник для зберігання записів у пам'яті[cite: 3, 4]
+    // Словник для зберігання записів у пам'яті
     private readonly Dictionary<string, Order> _items = 
         (seed ?? []).ToDictionary(o => o.Id, StringComparer.OrdinalIgnoreCase);
 
@@ -20,7 +20,7 @@ public sealed class InMemoryOrderStore(IEnumerable<Order>? seed = null) : IOrder
 
     public void Add(Order item)
     {
-        ArgumentNullException.ThrowIfNull(item); // Захист від null[cite: 8]
+        ArgumentNullException.ThrowIfNull(item); // Захист від null
         if (_items.ContainsKey(item.Id))
             throw new InvalidOperationException($"Замовлення з id={item.Id} уже існує.");
             

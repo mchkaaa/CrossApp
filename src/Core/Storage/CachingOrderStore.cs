@@ -1,8 +1,11 @@
 using Core.Abstractions;
 using CrossApp.Core.Domain;
+using System;
+using System.Collections.Generic;
+
 namespace Core.Storage;
 
-// ДОДАТКОВЕ ЗАВДАННЯ 1: Декоратор, що приймає інший IOrderStore[cite: 12]
+// ДОДАТКОВЕ ЗАВДАННЯ 1: Декоратор, що приймає інший IOrderStore
 public sealed class CachingOrderStore(IOrderStore innerStore) : IOrderStore
 {
     private readonly IOrderStore _innerStore = innerStore ?? throw new ArgumentNullException(nameof(innerStore));
@@ -38,4 +41,10 @@ public sealed class CachingOrderStore(IOrderStore innerStore) : IOrderStore
 
     public IReadOnlyList<Order> Find(Func<Order, bool> predicate) 
         => _innerStore.Find(predicate);
+
+    // Доданий метод для відображення реального сховища в консолі
+    public override string ToString()
+    {
+        return $"CachingOrderStore (обгортає {_innerStore.GetType().Name})";
+    }
 }

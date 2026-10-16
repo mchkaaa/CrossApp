@@ -7,13 +7,13 @@ namespace Core.Storage;
 
 public sealed class FileOrderStore(string path) : IOrderStore
 {
-    // Налаштування серіалізації: статичне readonly поле[cite: 9, 10]
+    // Налаштування серіалізації: статичне readonly поле
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
     private readonly Dictionary<string, Order> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _path = Path.GetFullPath(path);
     private bool _loaded;
 
-    // Дозавантаження при першому зверненні[cite: 4]
+    // Дозавантаження при першому зверненні
     private void EnsureLoaded()
     {
         if (_loaded) return;
@@ -22,19 +22,19 @@ public sealed class FileOrderStore(string path) : IOrderStore
             var dtos = JsonSerializer.Deserialize<List<OrderDto>>(File.ReadAllText(_path)) ?? [];
             foreach (var dto in dtos) 
             { 
-                var order = Order.FromDto(dto); // Мапінг з DTO у Сутність[cite: 5]
+                var order = Order.FromDto(dto); // Мапінг з DTO у Сутність
                 _cache[order.Id] = order; 
             }
         }
         _loaded = true;
     }
 
-    // Запис на диск після кожної зміни[cite: 4]
+    // Запис на диск після кожної зміни
     private void Flush()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!); // Оператор прощення null[cite: 9]
+        Directory.CreateDirectory(Path.GetDirectoryName(_path)!); // Оператор прощення null
         File.WriteAllText(_path, 
-            JsonSerializer.Serialize(_cache.Values.Select(o => o.ToDto()).ToList(), Options)); // Проєкція в DTO[cite: 10]
+            JsonSerializer.Serialize(_cache.Values.Select(o => o.ToDto()).ToList(), Options)); // Проєкція в DTO
     }
 
     public IReadOnlyList<Order> List() { EnsureLoaded(); return _cache.Values.ToList(); }
@@ -67,7 +67,7 @@ public sealed class FileOrderStore(string path) : IOrderStore
         return true;
     }
 
-    // Реалізація ДОДАТКОВОГО ЗАВДАННЯ 2[cite: 12]
+    // Реалізація ДОДАТКОВОГО ЗАВДАННЯ 2
     public IReadOnlyList<Order> Find(Func<Order, bool> predicate)
     {
         EnsureLoaded();

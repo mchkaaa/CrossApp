@@ -5,54 +5,114 @@ using CrossApp.Core.Domain;
 using CrossApp.Core.Services;
 using Core.Storage;
 using Core.Abstractions;
-
-// 1. Читаємо аргументи під час запуску (чи є прапорець --file)
-bool useFile = args.Contains("--file");
-string dataPath = Path.Combine(AppContext.BaseDirectory, "data", "orders.json");
-
-// 2. Composition Root: Ручне впровадження залежностей (DI)
-// Якщо консоль запущена з --file, створюємо FileOrderStore, інакше - InMemoryOrderStore
-IOrderStore baseStore = useFile 
-    ? new FileOrderStore(dataPath) 
-    : new InMemoryOrderStore();
-
-// Обертаємо сховище в Декоратор (якщо робимо Додаткове завдання 1)[cite: 12]
-IOrderStore store = new CachingOrderStore(baseStore);
-
-// Передаємо створене сховище в наш сервіс[cite: 6]
-var service = new OrderService(store);
-
-Console.WriteLine($"Сховище: {store.GetType().Name}");
+using CrossApp.Core.Events;
 
 // ==========================================
-// СЦЕНАРІЙ РОБОТИ (Замість старого TryDo)
+// 1. ІНІЦІАЛІЗАЦІЯ
+// ==========================================
+IOrderStore store = StoreFactory.Create(args);
+
+// Створюємо папку для логів заздалегідь, щоб і події, і FileSink могли туди писати
+var logsFolder = Path.Combine(AppContext.BaseDirectory, "logs");
+Directory.CreateDirectory(logsFolder);
+
+// Створюємо обидві реалізації (Додаткове завдання 1)
+var consoleSink = new ConsoleSink();
+var fileSink = new FileSink(Path.Combine(logsFolder, "sink_events.log"));
+
+// Передаємо одну з них у сервіс (наприклад, consoleSink, але можна легко змінити на fileSink)
+var service = new OrderService(store, consoleSink);
+
+Console.WriteLine($"Сховище: {store.GetType().Name}\n");
+
+// ==========================================
+// 2. ПІДПИСКА НА ПОДІЇ (Основне завдання 6)
+// ==========================================
+var logPath = Path.Combine(logsFolder, "app.log");
+
+// Підписник 1: Локальний метод
+void OnOrderChanged(object? sender, OrderChangedEventArgs e)
+{
+    var line = $"{e.At:HH:mm:ss} {e.Kind,-14} {e.OrderId} -> товарів: {e.LinesCount}, сума: {e.Total} грн";
+    Console.WriteLine($"[ПОДІЯ] {line}");
+    File.AppendAllText(logPath, line + Environment.NewLine);
+}
+
+// Підписник 2: Лямбда-лічильник
+int changes = 0;
+service.Changed += (_, _) => changes++; 
+
+// Підписуємо локальний метод
+service.Changed += OnOrderChanged;
+// ==========================================
+// 3. ДОПОМІЖНИЙ МЕТОД TryDo
+// ==========================================
+void TryDo(string title, Action action)
+{
+    Console.WriteLine($"=== {title} ===");
+    try
+    {
+        action();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"БЛОКУВАННЯ / ПОМИЛКА: {ex.Message}");
+    }
+}
+
+// ==========================================
+// 4. СЦЕНАРІЇ РОБОТИ
 // ==========================================
 
-Console.WriteLine("\n=== Сценарій 1: Успішне створення замовлень ===");
-try
-{
-    var order1 = service.CreateOrder("ORD-001", "CUST-777");
-    Console.WriteLine($"Створено замовлення: {order1.Id} для клієнта CUST-777");
-    
-    var order2 = service.CreateOrder("ORD-002", "CUST-777");
-    Console.WriteLine($"Створено замовлення: {order2.Id} для клієнта CUST-777");
-    
-    var order3 = service.CreateOrder("ORD-003", "CUST-777");
-    Console.WriteLine($"Створено замовлення: {order3.Id} для клієнта CUST-777");
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Помилка: {ex.Message}");
-}
+// Клієнт ЗАВЖДИ ТОЙ САМИЙ, щоб тестувати читання з файлу
+string cid = "CUST-777"; 
 
-// Крок 6: Сценарій відмови (перевірка бізнес-правила на 4-му замовленні)[cite: 6]
-Console.WriteLine("\n=== Сценарій 2: Відмова (Перевищення ліміту) ===");
-try
+// А от замовлення щоразу нові, щоб не було конфлікту ID
+string o1 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
+string o2 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
+string o3 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
+string o4 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
+
+TryDo("Сценарій 1: Успішне створення замовлень (є підписка)", () =>
 {
-    Console.WriteLine("Спроба створити 4-те активне замовлення для CUST-777...");
-    service.CreateOrder("ORD-004", "CUST-777"); // Цей рядок має викликати виняток
+    service.CreateOrder(o1, cid);
+    service.CreateOrder(o2, cid);
+});
+
+
+Console.WriteLine($"\nПодій отримано лямбдою-лічильником: {changes}\n");
+
+TryDo("Сценарій 2: Відписка", () =>
+{
+    service.Changed -= OnOrderChanged;
+    service.CreateOrder(o3, cid);
+    Console.WriteLine($"Замовлення {o3} створено тихо (без логу події)");
+});
+
+Console.WriteLine($"\nПодій отримано лямбдою-лічильником: {changes}\n");
+
+TryDo("Сценарій 3: Відмова (Перевищення ліміту)", () =>
+{
+    Console.WriteLine($"Спроба створити 4-те активне замовлення для {cid}...");
+    service.CreateOrder(o4, cid); 
+});
+
+Console.WriteLine();
+
+TryDo("Сценарій 4: Додаткове завдання 2 (Action для імпорту)", () =>
+{
+    string[] importData = { "ORD-999", "", "ORD-777" };
+    service.ImportOrders(importData, errorMsg => Console.WriteLine($"[ПОМИЛКА ІМПОРТУ]: {errorMsg}"));
+});
+
+// ==========================================
+// 5. ОГОЛОШЕННЯ КЛАСІВ (Має бути в самому кінці файлу!)
+// ==========================================
+class ConsoleSink : INotificationSink
+{
+    public void Notify(string message) => Console.WriteLine($"[ConsoleSink] {message}");
 }
-catch (Exception ex) // Перехоплюємо виняток у Cli[cite: 6]
+class FileSink(string filePath) : INotificationSink
 {
-    Console.WriteLine($"БЛОКУВАННЯ: {ex.Message}"); // Друкуємо зрозумілий текст[cite: 6]
+    public void Notify(string message) => File.AppendAllText(filePath, $"[FileSink] {message}\n");
 }

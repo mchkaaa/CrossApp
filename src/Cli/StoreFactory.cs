@@ -4,21 +4,29 @@ using System.Linq;
 using Core.Abstractions;
 using Core.Storage;
 
-namespace Cli;
-// ... далі твій код без змін
-// ДОДАТКОВЕ ЗАВДАННЯ 3: Фабрика[cite: 12]
+namespace CrossApp.Core.Services;
+
 public static class StoreFactory
 {
     public static IOrderStore Create(string[] args)
     {
-        bool useFile = args.Contains("--file"); // Перемикач режиму[cite: 6]
-        string dataPath = Path.Combine(AppContext.BaseDirectory, "data", "orders.json");
+        bool useFile = args.Contains("--file");
+        bool useCache = args.Contains("--cache");
 
+        // ПОВЕРНУЛИ ТВІЙ ПРАВИЛЬНИЙ ШЛЯХ З 5-Ї ЛАБИ!
+        string dataPath = Path.Combine(AppContext.BaseDirectory, "data", "orders.json");
+        
+        // Переконуємося, що папка data існує (якщо її видалили)
+        Directory.CreateDirectory(Path.GetDirectoryName(dataPath)!);
+
+        // Тернарний оператор для бази (тепер з правильним шляхом)
         IOrderStore baseStore = useFile 
             ? new FileOrderStore(dataPath) 
-            : new InMemoryOrderStore(); // Тут можна передати SeedData, якщо в тебе є
+            : new InMemoryOrderStore();
 
-        // Обертаємо базове сховище у Декоратор (Додаткове завдання 1)[cite: 12]
-        return new CachingOrderStore(baseStore);
+        // Тернарний оператор для кешу
+        return useCache 
+            ? new CachingOrderStore(baseStore) 
+            : baseStore;
     }
 }

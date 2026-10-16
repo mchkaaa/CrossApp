@@ -1,21 +1,27 @@
 using System;
-using System.Linq; // пошук, фільтрація
-using Core.Abstractions; // Твій шлях до інтерфейсу IOrderStore
-using CrossApp.Core.Domain;       // Твій шлях до сутності Order (якщо сервіс в іншій папці)
+using System.Linq;
+using Core.Abstractions;
+using CrossApp.Core.Domain;
+using CrossApp.Core.Events;
 
-namespace CrossApp.Core.Services; // Зазвичай сервіси тепер лежать у папці Services
+namespace CrossApp.Core.Services;
 
-// Ін'єкція залежності через первинний конструктор (параметр у дужках)[cite: 7]
-public sealed class OrderService(IOrderStore store)
+// Додано INotificationSink у первинний конструктор (Додаткове завдання 1)
+public sealed class OrderService(IOrderStore store, INotificationSink? sink = null)
 {
-    // Зберігаємо посилання на сховище і захищаємо від null[cite: 8, 9]
-    // ПУБЛІЧНОГО SET ТУТ БІЛЬШЕ НЕМАЄ!
     private readonly IOrderStore _store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly INotificationSink? _sink = sink;
+
+    // Подія (Основне завдання 6)
+    public event EventHandler<OrderChangedEventArgs>? Changed;
+
+    // Безпечний виклик події
+    private void OnChanged(Order o, OrderChangeKind kind, int linesCount, decimal total) =>
+        Changed?.Invoke(this, new OrderChangedEventArgs(o.Id, kind, linesCount, total));
 
     public Order CreateOrder(string orderId, string customerId)
     {
-        // Звертаємося не до внутрішнього списку, а до Сховища (_store)
-        // Використовуємо метод Find з додаткового завдання №2 (або _store.List().Count(...), якщо не робила його)[cite: 12]
+        // Використання Func для фільтрації
         var activeOrdersCount = _store.Find(o => o.CustomerId == customerId && o.IsActive).Count;
         
         if (activeOrdersCount >= 3)
@@ -25,9 +31,29 @@ public sealed class OrderService(IOrderStore store)
 
         var newOrder = Order.Create(orderId, customerId);
         
-        // Зберігаємо створене замовлення у файл або в пам'ять (сервіс не знає куди саме, він просто віддає команду)
         _store.Add(newOrder); 
         
+        // Піднімаємо подію ТІЛЬКИ ПІСЛЯ успішного додавання
+        OnChanged(newOrder, OrderChangeKind.Created, 1, 100.0m); 
+
+        // Сповіщаємо через додатковий інтерфейс (Додаткове завдання 1)
+        _sink?.Notify($"[Sink] Замовлення {orderId} успішно збережено в базу.");
+
         return newOrder;
+    }
+
+    // Метод з Action<string> для сповіщення про помилки (Додаткове завдання 2)
+    public void ImportOrders(string[] lines, Action<string> logError)
+    {
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                // Замість throw кидаємо помилку в делегат
+                logError("Пропущено порожній рядок.");
+                continue;
+            }
+            Console.WriteLine($"[Імпорт] Успішно оброблено рядок: {line}");
+        }
     }
 }
