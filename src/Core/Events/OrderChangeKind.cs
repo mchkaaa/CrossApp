@@ -1,6 +1,6 @@
 namespace CrossApp.Core.Events;
 
-// Види змін для замовлення (як вимагає методичка для твого домену)
+// Види змін для замовлення 
 public enum OrderChangeKind 
 { 
     Created,       // Замовлення створено

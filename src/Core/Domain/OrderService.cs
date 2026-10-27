@@ -45,15 +45,17 @@ public sealed class OrderService(IOrderStore store, INotificationSink? sink = nu
     // Метод з Action<string> для сповіщення про помилки (Додаткове завдання 2)
     public void ImportOrders(string[] lines, Action<string> logError)
     {
+
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line))
             {
-                // Замість throw кидаємо помилку в делегат
+
                 logError("Пропущено порожній рядок.");
                 continue;
-            }
-            Console.WriteLine($"[Імпорт] Успішно оброблено рядок: {line}");
+            }      
+             // Відправляємо успішне повідомлення 
+            _sink?.Notify($"[Імпорт] Успішно оброблено рядок: {line}");
         }
     }
 }
