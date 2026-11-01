@@ -1,7 +1,11 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
+using CrossApp.Core.Reports;
 using CrossApp.Core.Domain;
+using Core.Domain; // Підключення твого класу Customer
 using CrossApp.Core.Services;
 using Core.Storage;
 using Core.Abstractions;
@@ -10,27 +14,25 @@ using CrossApp.Core.Events;
 // ==========================================
 // 1. ІНІЦІАЛІЗАЦІЯ
 // ==========================================
+Console.OutputEncoding = System.Text.Encoding.UTF8; // Фікс українських літер у консолі
+
 IOrderStore store = StoreFactory.Create(args);
 
-// Створюємо папку для логів заздалегідь, щоб і події, і FileSink могли туди писати
 var logsFolder = Path.Combine(AppContext.BaseDirectory, "logs");
 Directory.CreateDirectory(logsFolder);
 
-// Створюємо обидві реалізації (Додаткове завдання 1)
 var consoleSink = new ConsoleSink();
 var fileSink = new FileSink(Path.Combine(logsFolder, "sink_events.log"));
 
-// Передаємо одну з них у сервіс (наприклад, consoleSink, але можна легко змінити на fileSink)
 var service = new OrderService(store, consoleSink);
 
 Console.WriteLine($"Сховище: {store.GetType().Name}\n");
 
 // ==========================================
-// 2. ПІДПИСКА НА ПОДІЇ (Основне завдання 6)
+// 2. ПІДПИСКА НА ПОДІЇ
 // ==========================================
 var logPath = Path.Combine(logsFolder, "app.log");
 
-// Підписник 1: Локальний метод
 void OnOrderChanged(object? sender, OrderChangedEventArgs e)
 {
     var line = $"{e.At:HH:mm:ss} {e.Kind,-14} {e.OrderId} -> товарів: {e.LinesCount}, сума: {e.Total} грн";
@@ -38,75 +40,142 @@ void OnOrderChanged(object? sender, OrderChangedEventArgs e)
     File.AppendAllText(logPath, line + Environment.NewLine);
 }
 
-// Підписник 2: Лямбда-лічильник
 int changes = 0;
 service.Changed += (_, _) => changes++; 
-
-// Підписуємо локальний метод
 service.Changed += OnOrderChanged;
+
 // ==========================================
 // 3. ДОПОМІЖНИЙ МЕТОД TryDo
 // ==========================================
 void TryDo(string title, Action action)
 {
     Console.WriteLine($"=== {title} ===");
-    try
-    {
-        action();
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"БЛОКУВАННЯ / ПОМИЛКА: {ex.Message}");
-    }
+    try { action(); }
+    catch (Exception ex) { Console.WriteLine($"БЛОКУВАННЯ / ПОМИЛКА: {ex.Message}"); }
 }
 
 // ==========================================
-// 4. СЦЕНАРІЇ РОБОТИ
+// 4. СЦЕНАРІЇ РОБОТИ (Лабораторна 6)
 // ==========================================
-
-// Клієнт ЗАВЖДИ ТОЙ САМИЙ, щоб тестувати читання з файлу
 string cid = "CUST-777"; 
-
-// А от замовлення щоразу нові, щоб не було конфлікту ID
 string o1 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
 string o2 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
 string o3 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
 string o4 = "ORD-" + Guid.NewGuid().ToString("N")[..4];
 
-TryDo("Сценарій 1: Успішне створення замовлень (є підписка)", () =>
+TryDo("Сценарій 1: Успішне створення замовлень", () =>
 {
     service.CreateOrder(o1, cid);
     service.CreateOrder(o2, cid);
 });
 
-
-Console.WriteLine($"\nПодій отримано лямбдою-лічильником: {changes}\n");
-
 TryDo("Сценарій 2: Відписка", () =>
 {
     service.Changed -= OnOrderChanged;
     service.CreateOrder(o3, cid);
-    Console.WriteLine($"Замовлення {o3} створено тихо (без логу події)");
 });
-
-Console.WriteLine($"\nПодій отримано лямбдою-лічильником: {changes}\n");
 
 TryDo("Сценарій 3: Відмова (Перевищення ліміту)", () =>
 {
-    Console.WriteLine($"Спроба створити 4-те активне замовлення для {cid}...");
     service.CreateOrder(o4, cid); 
 });
 
-Console.WriteLine();
-
-TryDo("Сценарій 4: Додаткове завдання 2 (Action для імпорту)", () =>
+TryDo("Сценарій 4: Action для імпорту", () =>
 {
     string[] importData = { "ORD-999", "", "ORD-777" };
     service.ImportOrders(importData, errorMsg => Console.WriteLine($"[ПОМИЛКА ІМПОРТУ]: {errorMsg}"));
 });
 
 // ==========================================
-// 5. ОГОЛОШЕННЯ КЛАСІВ (Має бути в самому кінці файлу!)
+// 5. ДЕМОНСТРАЦІЯ ВІДКЛАДЕНОГО ВИКОНАННЯ (Лабораторна 7)
+// ==========================================
+Console.WriteLine("\n=== Демо відкладеного виконання ===");
+var sourceList = store.List().ToList(); 
+
+var query = sourceList.Where(o => o.Total > 1000m); 
+Console.WriteLine($"Дорогих замовлень до змін: {query.Count()}");
+
+sourceList.Add(Order.Create("ORD-DEMO", "CUST-001", 5000m));
+Console.WriteLine($"Дорогих замовлень після змін: {query.Count()}"); 
+
+var snapshot = query.ToList();
+sourceList.Clear();
+Console.WriteLine($"У знімку лишилось: {snapshot.Count}\n"); 
+
+// ==========================================
+// 6. ЗВІТИ LINQ ЧЕРЕЗ CLI (Лабораторна 7)
+// ==========================================
+var items = store.List(); 
+var command = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "report-top";
+
+Console.WriteLine($"=== ЗВІТ: {command} ===");
+switch (command)
+{
+    case "report-top":
+        PrintOrders(ReportService.TopByTotal(items, 5));
+        break;
+    case "report-expensive":
+        PrintOrders(ReportService.ExpensiveOrders(items, 1000m));
+        break;
+    case "report-groups":
+        foreach (var g in ReportService.ByStatus(items))
+            Console.WriteLine($"Статус: {g.Status,-10} | позицій: {g.Count,3} | сумарно: {g.TotalSum} грн");
+        break;
+    case "report-sum":
+        var t = ReportService.Totals(items);
+        Console.WriteLine($"Позицій {t.Items}, всього {t.TotalSum} грн, середній чек {t.Average:F2} грн, макс {t.Max} грн");
+        break;
+        
+    // ==========================================
+    // ВИКЛИК ДОДАТКОВИХ ЗАВДАНЬ
+    // ==========================================
+    case "report-bonus":
+        Console.WriteLine("\n--- ЗАВДАННЯ 1: GroupJoin (Клієнти × Замовлення) ---");
+        
+        // Використовуємо твій клас Customer (приймає лише 1 параметр Id)
+        var customers = new[] { 
+            new Customer("CUST-001"), 
+            new Customer("CUST-002"), 
+            new Customer("CUST-999") 
+        };
+        foreach (var c in ReportService.CustomerStats(customers, items))
+            Console.WriteLine($"Клієнт: {c.CustomerId,-10} | Замовлень: {c.OrdersCount,2} | Сума: {c.TotalSum,6} грн");
+
+        Console.WriteLine("\n--- ЗАВДАННЯ 3: Синтаксис запитів (from ... group) ---");
+        foreach (var g in ReportService.ByStatusQuerySyntax(items))
+            Console.WriteLine($"Статус: {g.Status,-10} | позицій: {g.Count,3} | сумарно: {g.TotalSum} грн");
+
+        Console.WriteLine("\n--- ЗАВДАННЯ 4: Вимір часу Stopwatch (100 000 записів) ---");
+        var rand = new Random();
+        var massiveData = Enumerable.Range(1, 100_000)
+            .Select(i => Order.Create($"O-{i}", $"C-{rand.Next(1, 100)}", rand.Next(10, 5000)))
+            .ToList();
+
+        var sw = Stopwatch.StartNew();
+        var sum1 = massiveData.Where(o => o.Total > 1000).Sum(o => o.Total);
+        sw.Stop();
+        Console.WriteLine($"Без ToList в середині: {sw.ElapsedMilliseconds} мс (Сума: {sum1})");
+
+        sw.Restart();
+        var sum2 = massiveData.ToList().Where(o => o.Total > 1000).ToList().Sum(o => o.Total);
+        sw.Stop();
+        Console.WriteLine($"З ToList в середині:   {sw.ElapsedMilliseconds} мс (Сума: {sum2})");
+        break;
+
+    default:
+        Console.WriteLine("Команди: report-top | report-expensive | report-groups | report-sum | report-bonus");
+        break;
+}
+
+// Допоміжний метод для виводу таблиці
+static void PrintOrders(IReadOnlyList<CrossApp.Core.Reports.OrderLine> lines)
+{
+    foreach (var l in lines)
+        Console.WriteLine($" {l.OrderId,-10} Клієнт: {l.CustomerId,-12} Сума: {l.Total,8} грн  Статус: {l.Status}");
+}
+
+// ==========================================
+// 7. ОГОЛОШЕННЯ КЛАСІВ (Має бути в самому кінці файлу!)
 // ==========================================
 class ConsoleSink : INotificationSink
 {

@@ -1,14 +1,19 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Core.Abstractions;
 using CrossApp.Core.Domain;
 using Core.Dto;
+using CrossApp.Core; // Додаємо цей using, щоб бачити клас SampleData
 
 namespace Core.Storage;
 
 public sealed class InMemoryOrderStore(IEnumerable<Order>? seed = null) : IOrderStore
 {
-    // Словник для зберігання записів у пам'яті
+    // Якщо seed передали — використовуємо його. 
+    // Якщо ні — беремо 20 готових замовлень із SampleData
     private readonly Dictionary<string, Order> _items = 
-        (seed ?? []).ToDictionary(o => o.Id, StringComparer.OrdinalIgnoreCase);
+        (seed ?? SampleData.Generate()).ToDictionary(o => o.Id, StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<Order> List() => _items.Values.ToList();
     

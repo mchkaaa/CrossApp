@@ -15,20 +15,22 @@ public class Order
     public string Id { get; }
     public string CustomerId { get; }
     public bool IsActive { get; set; } = true;
-    
     public OrderStatus Status { get; private set; } = OrderStatus.Draft;
+    
+    // НОВЕ: числове поле для звітів LINQ
+    public decimal Total { get; private set; }
 
-    // 1. Робимо конструктор приватним (ніхто не зможе викликати new Order)
-    private Order(string id, string customerId)
+    private Order(string id, string customerId, decimal total)
     {
         Id = id;
         CustomerId = customerId;
+        Total = total;
     }
 
-    // 2. Додаємо фабричний метод
-    public static Order Create(string id, string customerId)
+    // Додано total у фабричний метод
+    public static Order Create(string id, string customerId, decimal total = 0m)
     {
-        return new Order(id, customerId);
+        return new Order(id, customerId, total);
     }
 
     public void ChangeStatus(OrderStatus newStatus)
@@ -48,26 +50,16 @@ public class Order
         Status = newStatus;
     }
 
-    // =========================================================
-    // НОВЕ: МЕТОДИ ДЛЯ 5-Ї ЛАБОРАТОРНОЇ РОБОТИ (МАПІНГ З/В DTO)
-    // =========================================================
-
-    // 3. Відновлення об'єкта з JSON-файлу
     public static Order FromDto(OrderDto dto)
     {
-        // Ми викликаємо приватний конструктор, щоб відновити базові дані.
-        var order = new Order(dto.Id, dto.CustomerId);
-        
-        // Відновлюємо поточний стан (навіть private set доступний всередині класу)
+        var order = new Order(dto.Id, dto.CustomerId, dto.Total);
         order.IsActive = dto.IsActive;
         order.Status = dto.Status;
-        
         return order;
     }
 
-    // 4. Пакування об'єкта для збереження на диск
     public OrderDto ToDto()
     {
-        return new OrderDto(Id, CustomerId, IsActive, Status);
+        return new OrderDto(Id, CustomerId, IsActive, Status, Total);
     }
 }
