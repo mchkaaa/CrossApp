@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading; // ДОДАНО: Для роботи з CancellationToken
 using System.Collections.Generic;
 using System.Diagnostics;
+using CrossApp.Core; // ДОДАНО: Щоб бачити DomainException
 using CrossApp.Core.Reports;
 using CrossApp.Core.Domain;
-using Core.Domain; // Підключення твого класу Customer
+using Core.Domain; 
 using CrossApp.Core.Services;
 using Core.Storage;
 using Core.Abstractions;
@@ -103,14 +105,64 @@ sourceList.Clear();
 Console.WriteLine($"У знімку лишилось: {snapshot.Count}\n"); 
 
 // ==========================================
-// 6. ЗВІТИ LINQ ЧЕРЕЗ CLI (Лабораторна 7)
+// 6. ЗВІТИ ТА ІМПОРТ ЧЕРЕЗ CLI 
 // ==========================================
 var items = store.List(); 
-var command = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "report-top";
+var command = args.FirstOrDefault() ?? "report-top";
 
-Console.WriteLine($"=== ЗВІТ: {command} ===");
+Console.WriteLine($"=== КОМАНДА: {command} ===");
 switch (command)
 {
+    // ==========================================
+    // ЛАБОРАТОРНА 8: АСИНХРОННИЙ ІМПОРТ
+    // ==========================================
+    case "--file":
+    case "import":
+    {
+        using var userCts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => 
+        { 
+            e.Cancel = true; 
+            userCts.Cancel(); 
+        };
+
+        // Створюємо таймаут-токен на 5 секунд
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); 
+        
+        // Об'єднуємо токен користувача і токен таймауту
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(userCts.Token, timeoutCts.Token);
+
+        var dataPath = "orders.json";
+        Console.WriteLine("Починаємо імпорт (натисніть Ctrl+C для скасування)...");
+
+        // Реалізація IProgress (малює кількість оброблених записів в одному рядку через \r)
+        var progress = new Progress<int>(p => 
+        {
+            Console.Write($"\r[Імпорт] Завантажено записів: {p}");
+        });
+
+        try
+        {
+            var importer = new JsonOrderImporter();
+            var added = await service.ImportAsync(importer, dataPath, linkedCts.Token, progress);
+            Console.WriteLine($"\nУспішно завершено. Разом додано: {added}");
+        }
+        catch (OperationCanceledException) 
+        { 
+            // Перевіряємо, який саме токен спрацював
+            if (timeoutCts.IsCancellationRequested)
+                Console.WriteLine("\nІмпорт скасовано автоматично: перевищено ліміт часу (5 сек).");
+            else
+                Console.WriteLine("\nІмпорт скасовано користувачем (Ctrl+C).");
+        }
+        catch (DomainException ex) { Console.WriteLine($"\nДані відхилено: {ex.Message}"); }
+        catch (FileNotFoundException) { Console.WriteLine($"\nФайл не знайдено: {dataPath}"); }
+        break;
+    }
+
+    // ==========================================
+    // ЗВІТИ LINQ (Лабораторна 7)
+    // ==========================================
     case "report-top":
         PrintOrders(ReportService.TopByTotal(items, 5));
         break;
@@ -126,13 +178,8 @@ switch (command)
         Console.WriteLine($"Позицій {t.Items}, всього {t.TotalSum} грн, середній чек {t.Average:F2} грн, макс {t.Max} грн");
         break;
         
-    // ==========================================
-    // ВИКЛИК ДОДАТКОВИХ ЗАВДАНЬ
-    // ==========================================
     case "report-bonus":
         Console.WriteLine("\n--- ЗАВДАННЯ 1: GroupJoin (Клієнти × Замовлення) ---");
-        
-        // Використовуємо твій клас Customer (приймає лише 1 параметр Id)
         var customers = new[] { 
             new Customer("CUST-001"), 
             new Customer("CUST-002"), 
@@ -163,7 +210,7 @@ switch (command)
         break;
 
     default:
-        Console.WriteLine("Команди: report-top | report-expensive | report-groups | report-sum | report-bonus");
+        Console.WriteLine("Команди: import | report-top | report-expensive | report-groups | report-sum | report-bonus");
         break;
 }
 

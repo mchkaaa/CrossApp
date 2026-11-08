@@ -39,7 +39,7 @@ public static class ReportService
     public static IReadOnlyList<CustomerOrderSummary> CustomerStats(IEnumerable<Customer> customers, IEnumerable<Order> orders) =>
         customers.GroupJoin(
             orders,
-            c => c.Id,          // Ключ із твого класу Customer
+            c => c.Id,          // Ключ із класу Customer
             o => o.CustomerId,  // Ключ із класу Order
             (c, ords) => new CustomerOrderSummary(c.Id, ords.Count(), ords.Sum(o => o.Total)) // Проєкція у зведений DTO
         ).ToList();

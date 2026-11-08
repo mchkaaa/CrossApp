@@ -3,6 +3,8 @@ using System.Linq;
 using Core.Abstractions;
 using CrossApp.Core.Domain;
 using CrossApp.Core.Events;
+using CrossApp.Core;              // Щоб він побачив DomainException
+using System;
 
 namespace CrossApp.Core.Services;
 
@@ -58,4 +60,34 @@ public sealed class OrderService(IOrderStore store, INotificationSink? sink = nu
             _sink?.Notify($"[Імпорт] Успішно оброблено рядок: {line}");
         }
     }
+
+    // Додай using System; на початку файлу
+public async Task<int> ImportAsync(IOrderImporter importer, string path, CancellationToken ct = default, IProgress<int>? progress = null)
+{
+    ct.ThrowIfCancellationRequested();
+    var added = 0;
+
+    // await foreach для роботи з IAsyncEnumerable
+    await foreach (var item in importer.LoadAsync(path, ct))
+    {
+        ct.ThrowIfCancellationRequested();
+        await Task.Delay(500, ct);
+        
+        var existing = _store.GetById(item.Id);
+        if (existing != null)
+        {
+            if (existing.Status == OrderStatus.Confirmed)
+                throw new DomainException($"Замовлення {item.Id} вже підтверджено.");
+            continue;
+        }
+
+        _store.Add(item);
+        OnChanged(item, OrderChangeKind.Created, 1, item.Total);
+        added++;
+        
+        // Звітуємо про прогрес
+        progress?.Report(added);
+    }
+    return added;
+}
 }
