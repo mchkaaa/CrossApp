@@ -30,6 +30,14 @@ public class Order
     // Додано total у фабричний метод
     public static Order Create(string id, string customerId, decimal total = 0m)
     {
+        if (string.IsNullOrWhiteSpace(id))
+
+{
+    // Якщо у вас кастомний виняток:
+        throw new DomainException("ID замовлення не може бути порожнім!"); 
+    // Або стандартний, якщо кастомного немає:
+    // throw new ArgumentException("ID замовлення не може бути порожнім!"); 
+}
         return new Order(id, customerId, total);
     }
 

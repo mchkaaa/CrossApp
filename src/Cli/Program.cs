@@ -1,10 +1,12 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Threading; // ДОДАНО: Для роботи з CancellationToken
+using System.Threading;
 using System.Collections.Generic;
 using System.Diagnostics;
-using CrossApp.Core; // ДОДАНО: Щоб бачити DomainException
+using System.Reflection;
+using Microsoft.Extensions.Configuration; // ДОДАНО: Для конфігурації
+using CrossApp.Core;
 using CrossApp.Core.Reports;
 using CrossApp.Core.Domain;
 using Core.Domain; 
@@ -12,11 +14,44 @@ using CrossApp.Core.Services;
 using Core.Storage;
 using Core.Abstractions;
 using CrossApp.Core.Events;
+using Core.Configuration; // ДОДАНО: Для класів AppOptions
 
 // ==========================================
-// 1. ІНІЦІАЛІЗАЦІЯ
+// 1. ІНІЦІАЛІЗАЦІЯ ТА КОНФІГУРАЦІЯ (Лабораторна 9)
 // ==========================================
-Console.OutputEncoding = System.Text.Encoding.UTF8; // Фікс українських літер у консолі
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+// Читаємо ім'я середовища зі змінних ОС
+var envName = Environment.GetEnvironmentVariable("CROSSAPP_ENVIRONMENT") ?? "Development";
+
+// Збираємо стек конфігурації (Лабораторна 9)
+var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory) // базовий каталог скомпільованих файлів
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+    .AddJsonFile($"appsettings.{envName}.json", optional: true)
+    .AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true)
+    .AddEnvironmentVariables(prefix: "CROSSAPP_")
+    .AddCommandLine(args)
+    .Build();
+
+// Біндимо налаштування в класи
+var options = config.Get<AppOptions>() ?? new AppOptions();
+
+// Підтримка старої змінної середовища
+var legacy = Environment.GetEnvironmentVariable("CROSSAPP_DATA_PATH");
+var storage = new StorageOptions
+{
+    DataPath = string.IsNullOrWhiteSpace(legacy) ? options.Storage.DataPath : legacy,
+    FileName = options.Storage.FileName
+};
+
+// Читаємо Secret
+var apiKey = config["Integration:ApiKey"];
+var fullDataPath = storage.ResolveFullPath(AppContext.BaseDirectory);
+
+// Виводимо для захисту
+Console.WriteLine($"Файл даних: {fullDataPath}");
+Console.WriteLine(apiKey is null ? "ApiKey: не заданий" : $"ApiKey: присутній, довжина {apiKey.Length}\n");
 
 IOrderStore store = StoreFactory.Create(args);
 
@@ -37,7 +72,7 @@ var logPath = Path.Combine(logsFolder, "app.log");
 
 void OnOrderChanged(object? sender, OrderChangedEventArgs e)
 {
-    var line = $"{e.At:HH:mm:ss} {e.Kind,-14} {e.OrderId} -> товарів: {e.LinesCount}, сума: {e.Total} грн";
+    var line = $"{e.At:HH:mm:ss} {e.Kind,-14} {e.OrderId} -> товарів: {e.LinesCount}, сума: {e.Total} {options.Orders.Currency}";
     Console.WriteLine($"[ПОДІЯ] {line}");
     File.AppendAllText(logPath, line + Environment.NewLine);
 }
@@ -114,7 +149,7 @@ Console.WriteLine($"=== КОМАНДА: {command} ===");
 switch (command)
 {
     // ==========================================
-    // ЛАБОРАТОРНА 8: АСИНХРОННИЙ ІМПОРТ
+    // ЛАБОРАТОРНА 8 + 9: АСИНХРОННИЙ ІМПОРТ З КОНФІГУРАЦІЄЮ
     // ==========================================
     case "--file":
     case "import":
@@ -126,16 +161,14 @@ switch (command)
             userCts.Cancel(); 
         };
 
-        // Створюємо таймаут-токен на 5 секунд
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); 
-        
-        // Об'єднуємо токен користувача і токен таймауту
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(userCts.Token, timeoutCts.Token);
 
-        var dataPath = "orders.json";
+        // Тепер беремо шлях із конфігурації
+        var dataPath = fullDataPath; 
+        
         Console.WriteLine("Починаємо імпорт (натисніть Ctrl+C для скасування)...");
 
-        // Реалізація IProgress (малює кількість оброблених записів в одному рядку через \r)
         var progress = new Progress<int>(p => 
         {
             Console.Write($"\r[Імпорт] Завантажено записів: {p}");
@@ -149,9 +182,8 @@ switch (command)
         }
         catch (OperationCanceledException) 
         { 
-            // Перевіряємо, який саме токен спрацював
             if (timeoutCts.IsCancellationRequested)
-                Console.WriteLine("\nІмпорт скасовано автоматично: перевищено ліміт часу (5 сек).");
+                Console.WriteLine("\nІмпорт скасовано автоматично: перевищено ліміт часу (30 сек).");
             else
                 Console.WriteLine("\nІмпорт скасовано користувачем (Ctrl+C).");
         }
@@ -161,21 +193,21 @@ switch (command)
     }
 
     // ==========================================
-    // ЗВІТИ LINQ (Лабораторна 7)
+    // ЗВІТИ LINQ
     // ==========================================
     case "report-top":
-        PrintOrders(ReportService.TopByTotal(items, 5));
+        PrintOrders(ReportService.TopByTotal(items, 5), options.Orders.Currency);
         break;
     case "report-expensive":
-        PrintOrders(ReportService.ExpensiveOrders(items, 1000m));
+        PrintOrders(ReportService.ExpensiveOrders(items, 1000m), options.Orders.Currency);
         break;
     case "report-groups":
         foreach (var g in ReportService.ByStatus(items))
-            Console.WriteLine($"Статус: {g.Status,-10} | позицій: {g.Count,3} | сумарно: {g.TotalSum} грн");
+            Console.WriteLine($"Статус: {g.Status,-10} | позицій: {g.Count,3} | сумарно: {g.TotalSum} {options.Orders.Currency}");
         break;
     case "report-sum":
         var t = ReportService.Totals(items);
-        Console.WriteLine($"Позицій {t.Items}, всього {t.TotalSum} грн, середній чек {t.Average:F2} грн, макс {t.Max} грн");
+        Console.WriteLine($"Позицій {t.Items}, всього {t.TotalSum} {options.Orders.Currency}, середній чек {t.Average:F2} {options.Orders.Currency}, макс {t.Max} {options.Orders.Currency}");
         break;
         
     case "report-bonus":
@@ -186,11 +218,11 @@ switch (command)
             new Customer("CUST-999") 
         };
         foreach (var c in ReportService.CustomerStats(customers, items))
-            Console.WriteLine($"Клієнт: {c.CustomerId,-10} | Замовлень: {c.OrdersCount,2} | Сума: {c.TotalSum,6} грн");
+            Console.WriteLine($"Клієнт: {c.CustomerId,-10} | Замовлень: {c.OrdersCount,2} | Сума: {c.TotalSum,6} {options.Orders.Currency}");
 
         Console.WriteLine("\n--- ЗАВДАННЯ 3: Синтаксис запитів (from ... group) ---");
         foreach (var g in ReportService.ByStatusQuerySyntax(items))
-            Console.WriteLine($"Статус: {g.Status,-10} | позицій: {g.Count,3} | сумарно: {g.TotalSum} грн");
+            Console.WriteLine($"Статус: {g.Status,-10} | позицій: {g.Count,3} | сумарно: {g.TotalSum} {options.Orders.Currency}");
 
         Console.WriteLine("\n--- ЗАВДАННЯ 4: Вимір часу Stopwatch (100 000 записів) ---");
         var rand = new Random();
@@ -214,11 +246,11 @@ switch (command)
         break;
 }
 
-// Допоміжний метод для виводу таблиці
-static void PrintOrders(IReadOnlyList<CrossApp.Core.Reports.OrderLine> lines)
+// Допоміжний метод для виводу таблиці (додали валюту)
+static void PrintOrders(IReadOnlyList<CrossApp.Core.Reports.OrderLine> lines, string currency)
 {
     foreach (var l in lines)
-        Console.WriteLine($" {l.OrderId,-10} Клієнт: {l.CustomerId,-12} Сума: {l.Total,8} грн  Статус: {l.Status}");
+        Console.WriteLine($" {l.OrderId,-10} Клієнт: {l.CustomerId,-12} Сума: {l.Total,8} {currency}  Статус: {l.Status}");
 }
 
 // ==========================================
