@@ -14,6 +14,8 @@ using CrossApp.Core.Services;
 using Core.Storage;
 using Core.Abstractions;
 using CrossApp.Core.Events;
+using System.Text.Json;
+using System.Text.Encodings.Web;
 using Core.Configuration; // ДОДАНО: Для класів AppOptions
 
 // ==========================================
@@ -149,6 +151,38 @@ Console.WriteLine($"=== КОМАНДА: {command} ===");
 switch (command)
 {
     // ==========================================
+    // ЛАБОРАТОРНА 9: ЕКСПОРТ (Вивід збереженого файлу)
+    // ==========================================
+    case "--export":
+    case "export":
+    {
+        var exportList = items.ToList();
+        Console.WriteLine($"Експортовано {exportList.Count} записів.");
+        
+        // 1. Гарантуємо, що папка існує (програма сама створить C:\Temp\MyData)
+        var dir = Path.GetDirectoryName(fullDataPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+        
+        // 2. Серіалізуємо дані в JSON та записуємо (експортуємо) у файл
+        var optionsJson = new JsonSerializerOptions 
+        { 
+            WriteIndented = true, 
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
+        };
+        var jsonText = JsonSerializer.Serialize(exportList, optionsJson);
+        File.WriteAllText(fullDataPath, jsonText);
+        
+        // 3. Виводимо результат у консоль
+        Console.WriteLine($"{storage.DataPath}/{storage.FileName}:");
+        Console.WriteLine(jsonText);
+        break;
+    }
+
+    // ==========================================
     // ЛАБОРАТОРНА 8 + 9: АСИНХРОННИЙ ІМПОРТ З КОНФІГУРАЦІЄЮ
     // ==========================================
     case "--file":
@@ -242,7 +276,7 @@ switch (command)
         break;
 
     default:
-        Console.WriteLine("Команди: import | report-top | report-expensive | report-groups | report-sum | report-bonus");
+        Console.WriteLine("Команди: import | export | report-top | report-expensive | report-groups | report-sum | report-bonus");
         break;
 }
 

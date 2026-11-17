@@ -29,12 +29,20 @@ public sealed class FileOrderStore(string path) : IOrderStore
         _loaded = true;
     }
 
-    // Запис на диск після кожної зміни
+    // Запис на диск після кожної зміни (Атомарний)
     private void Flush()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!); // Оператор прощення null
-        File.WriteAllText(_path, 
-            JsonSerializer.Serialize(_cache.Values.Select(o => o.ToDto()).ToList(), Options)); // Проєкція в DTO
+        Directory.CreateDirectory(Path.GetDirectoryName(_path)!); 
+        
+        // Генеруємо JSON
+        var jsonText = JsonSerializer.Serialize(_cache.Values.Select(o => o.ToDto()).ToList(), Options);
+        
+        // 1. Пишемо у тимчасовий файл
+        var tempPath = _path + ".tmp";
+        File.WriteAllText(tempPath, jsonText);
+        
+        // 2. Атомарно замінюємо оригінальний файл новим
+        File.Move(tempPath, _path, overwrite: true); 
     }
 
     public IReadOnlyList<Order> List() { EnsureLoaded(); return _cache.Values.ToList(); }

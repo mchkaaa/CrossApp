@@ -110,3 +110,43 @@
 **Команди для перевірки:**
 - **Запуск тестів:** `dotnet test --collect:"XPlat Code Coverage"`
 - **Перевірка скасування:** `dotnet run --project src/Cli -- --file` (натиснути `Ctrl+C` для ручного скасування, або дочекатися спрацьовування таймауту).
+
+## Конфігурація (Лабораторна робота 9)
+
+### Профілі середовища
+У проєкті налаштовано два базові профілі конфігурації:
+* **Production** (`appsettings.json`) — стандартний робочий профіль, мінімальний рівень логування `Information`.
+* **Development** (`appsettings.Development.json`) — профіль для розробки, активовано детальніший рівень логування `Debug`.
+
+### Таблиця ключів конфігурації
+| Ключ | Типове значення | Опис |
+| :--- | :--- | :--- |
+| `EnvironmentName` | Production | Поточне середовище запуску |
+| `Logging:LogLevel:Default` | Information / Debug | Мінімальний рівень логування |
+| `Storage:DataPath` | data | Відносний шлях до папки з даними |
+| `Storage:FileName` | orders.json | Назва JSON-файлу з даними |
+| `Orders:Currency` | UAH | Валюта замовлень |
+| `Integration:ApiKey` | *(User Secret)* | Секретний ключ інтеграції (не зберігається в Git) |
+
+### Перевизначення через змінні середовища
+Налаштування можна перевизначити без зміни програмного коду. Для вкладених ключів використовується префікс `CROSSAPP_` та подвійне підкреслення замість двокрапки. Також підтримується проста змінна `CROSSAPP_DATA_PATH` для прямого перекриття шляху до даних.
+
+**Приклади для PowerShell (Windows):**
+
+$env:CROSSAPP_DATA_PATH = "C:\Users\st\data"
+$env:CROSSAPP_Orders__Currency = "USD"
+$env:CROSSAPP_Integration_ApiKey = "my-secret-key"
+dotnet run --project src/Cli -- import
+
+
+**Приклади для Bash (Linux / macOS):**
+
+export CROSSAPP_DATA_PATH="/tmp/data"
+export CROSSAPP_Orders__Currency="USD"
+export CROSSAPP_Integration_ApiKey="my-secret-key"
+dotnet run --project src/Cli -- import
+
+
+**Або запуск із перевизначенням в один рядок:**
+
+CROSSAPP_DATA_PATH=/tmp/data dotnet run --project src/Cli -- export
