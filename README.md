@@ -134,16 +134,22 @@
 **Приклади для PowerShell (Windows):**
 
 $env:CROSSAPP_DATA_PATH = "C:\Users\st\data"
+
 $env:CROSSAPP_Orders__Currency = "USD"
+
 $env:CROSSAPP_Integration_ApiKey = "my-secret-key"
+
 dotnet run --project src/Cli -- import
 
 
 **Приклади для Bash (Linux / macOS):**
 
 export CROSSAPP_DATA_PATH="/tmp/data"
+
 export CROSSAPP_Orders__Currency="USD"
+
 export CROSSAPP_Integration_ApiKey="my-secret-key"
+
 dotnet run --project src/Cli -- import
 
 
