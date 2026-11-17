@@ -155,4 +155,6 @@ dotnet run --project src/Cli -- import
 
 **Або запуск із перевизначенням в один рядок:**
 
-CROSSAPP_DATA_PATH=/tmp/data dotnet run --project src/Cli -- export
+CROSSAPP_DATA_PATH=/tmp/data 
+
+dotnet run --project src/Cli -- export
