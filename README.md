@@ -134,21 +134,28 @@
 **Приклади для PowerShell (Windows):**
 
 $env:CROSSAPP_DATA_PATH = "C:\Users\st\data"
+
 $env:CROSSAPP_Orders__Currency = "USD"
+
 $env:CROSSAPP_Integration_ApiKey = "my-secret-key"
+
 dotnet run --project src/Cli -- import
 
 
 **Приклади для Bash (Linux / macOS):**
 
 export CROSSAPP_DATA_PATH="/tmp/data"
+
 export CROSSAPP_Orders__Currency="USD"
+
 export CROSSAPP_Integration_ApiKey="my-secret-key"
+
 dotnet run --project src/Cli -- import
 
 
 **Або запуск із перевизначенням в один рядок:**
 
+<<<<<<< HEAD
 CROSSAPP_DATA_PATH=/tmp/data dotnet run --project src/Cli -- export
 
 
@@ -216,3 +223,8 @@ curl -i -X DELETE http://localhost:5080/api/orders/ORD-1001
 ```bash
 dotnet test
 ```
+=======
+CROSSAPP_DATA_PATH=/tmp/data 
+
+dotnet run --project src/Cli -- export
+>>>>>>> ba19d1dce371a4f8eb8f2a69b98f17e1917dc4f4
