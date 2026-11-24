@@ -150,3 +150,69 @@ dotnet run --project src/Cli -- import
 **Або запуск із перевизначенням в один рядок:**
 
 CROSSAPP_DATA_PATH=/tmp/data dotnet run --project src/Cli -- export
+
+
+## HTTP API (Лабораторна робота №10)
+
+Вебзастосунок (`src/Api`) реалізує RESTful Minimal API на базі **.NET 10** для управління замовленнями (`/api/orders`) із використанням потокобезпечного сховища `InMemoryOrderStore`, валідації через **FluentValidation** (`EndpointFilter`), обробки помилок у форматі **RFC 9457 ProblemDetails** та інтерактивної документації **Scalar UI**.
+
+### Запуск сервера
+
+```bash
+dotnet run --project src/Api --urls http://localhost:5080
+```
+
+Після запуску доступні:
+- **Scalar UI:** `http://localhost:5080/scalar/v1`
+- **OpenAPI специфікація:** `http://localhost:5080/openapi/v1.json`
+- **Healthcheck:** `http://localhost:5080/health`
+
+### Доступні маршрути
+
+| Метод | Маршрут | Опис | Коди відповідей |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Перевірка працездатності сервісу | `200 OK` |
+| `GET` | `/api/orders` | Список замовлень із пагінацією та пошуком (`?page=1&pageSize=20&search=...&customerId=...`) | `200 OK` |
+| `GET` | `/api/orders/{id}` | Отримання замовлення за ідентифікатором | `200 OK`, `404 Not Found` |
+| `GET` | `/api/orders/{id}/total` | Отримання загальної суми замовлення | `200 OK`, `404 Not Found` |
+| `POST` | `/api/orders` | Створення нового замовлення (валідація через `FluentValidation`) | `201 Created`, `400 Bad Request` |
+| `PUT` | `/api/orders/{id}` | Повне оновлення існуючого замовлення | `200 OK`, `400 Bad Request`, `404 Not Found` |
+| `POST` | `/api/orders/{id}/confirm` | Підтвердження замовлення (мапінг `DomainException` у `409`) | `200 OK`, `404 Not Found`, `409 Conflict` |
+| `DELETE` | `/api/orders/{id}` | Видалення замовлення за ідентифікатором | `204 No Content`, `404 Not Found` |
+
+### Приклади запитів (`curl`)
+
+```bash
+# 1. Створення замовлення (201 Created + заголовок Location)
+curl -i -X POST http://localhost:5080/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":"CUST-101","isActive":true,"lines":[{"productId":"PROD-1","price":250.5,"quantity":2}]}'
+
+# 2. Отримання списку замовлень з пагінацією та пошуком (200 OK)
+curl -i "http://localhost:5080/api/orders?page=1&pageSize=5&search=CUST-001"
+
+# 3. Отримання конкретного замовлення та його суми (200 OK)
+curl -i http://localhost:5080/api/orders/ORD-1001
+curl -i http://localhost:5080/api/orders/ORD-1001/total
+
+# 4. Перевірка валідації при некоректних даних (400 Bad Request)
+curl -i -X POST http://localhost:5080/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":"","lines":[]}'
+
+# 5. Оновлення замовлення (200 OK)
+curl -i -X PUT http://localhost:5080/api/orders/ORD-1001 \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":"CUST-101","isActive":false,"lines":[{"productId":"PROD-1","price":300,"quantity":3}]}'
+
+# 6. Видалення замовлення (204 No Content)
+curl -i -X DELETE http://localhost:5080/api/orders/ORD-1001
+```
+
+### Запуск тестів
+
+Рішення містить модульні (`tests/Core.Tests`) та інтеграційні тести на базі `WebApplicationFactory` (`tests/Api.Tests`):
+
+```bash
+dotnet test
+```

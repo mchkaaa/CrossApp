@@ -7,7 +7,7 @@ public sealed class AppOptions
     public OrdersOptions Orders { get; init; } = new();
 }
 
-// Налаштування для твого домену (Замовлення)
+// Налаштування для домену (Замовлення)
 public sealed class OrdersOptions
 {
     public string Currency { get; init; } = "UAH";
@@ -20,7 +20,7 @@ public sealed class StorageOptions
 
     public string ResolveFullPath(string baseDir)
     {
-        // Path.Combine використовується для кросплатформності замість зліплювання рядків через "\"[cite: 3, 6, 10]
+        // Path.Combine використовується для кросплатформності замість зліплювання рядків через "\"
         var root = Path.IsPathRooted(DataPath) ? DataPath : Path.Combine(baseDir, DataPath);
         Directory.CreateDirectory(root);
         return Path.GetFullPath(Path.Combine(root, FileName));

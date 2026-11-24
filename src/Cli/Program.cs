@@ -177,7 +177,7 @@ switch (command)
         File.WriteAllText(fullDataPath, jsonText);
         
         // 3. Виводимо результат у консоль
-        Console.WriteLine($"{storage.DataPath}/{storage.FileName}:");
+        Console.WriteLine($"{fullDataPath}:");
         Console.WriteLine(jsonText);
         break;
     }

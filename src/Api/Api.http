@@ -1,0 +1,57 @@
+@baseUrl = http://localhost:5080
+
+### 1. Перевірка стану API
+GET {{baseUrl}}/health
+
+### 2. Отримати список усіх замовлень
+GET {{baseUrl}}/api/orders
+
+### 3. Створити нове замовлення (очікується 201 Created)
+# @name createOrder
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "customerId": "CUST-101",
+  "isActive": true,
+  "lines": [
+    { "productId": "PROD-1", "price": 250.50, "quantity": 2 },
+    { "productId": "PROD-2", "price": 100.00, "quantity": 1 }
+  ]
+}
+
+### 4. Перевірка валідації (400 Bad Request)
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "customerId": "",
+  "isActive": true,
+  "lines": []
+}
+
+@orderId = {{createOrder.response.body.$.id}}
+
+### 5. Отримати створене замовлення за ID (200 OK)
+GET {{baseUrl}}/api/orders/{{orderId}}
+
+### 6. Отримати загальну суму замовлення (200 OK)
+GET {{baseUrl}}/api/orders/{{orderId}}/total
+
+### 7. Оновити замовлення за ID (200 OK)
+PUT {{baseUrl}}/api/orders/{{orderId}}
+Content-Type: application/json
+
+{
+  "customerId": "CUST-101",
+  "isActive": false,
+  "lines": [
+    { "productId": "PROD-1", "price": 300.00, "quantity": 3 }
+  ]
+}
+
+### 8. Видалити замовлення за ID (204 No Content)
+DELETE {{baseUrl}}/api/orders/{{orderId}}
+
+### 9. Перевірити, що після видалення повертається 404 Not Found
+GET {{baseUrl}}/api/orders/{{orderId}}
